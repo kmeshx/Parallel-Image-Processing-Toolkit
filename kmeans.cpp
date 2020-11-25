@@ -121,9 +121,6 @@ DataFrame k_means(DataFrame& data, int width, int height,
     index = (int)(indices(random_number_generator)/CHANNEL_NUM);
     means.at(i) = data[index];
   }
-  //check means
-  //printf("Means Size: %d\n", means.size());
-  //for(int i=0; i<k; i++){ printf("Mean[%d] Index in Data: %f\n", i, means.at(i).x);}
   std::vector<size_t> assignments(data.size());
   for(size_t iteration = 0; iteration < number_of_iterations; ++iteration) {
     // Find assignments.
@@ -183,17 +180,9 @@ int main(int argc, char **argv){
     printf("Starting off ... \n");
     const char *img_file = "cs_test1.jpg";
     int width, height, bpp;
-
-    uint8_t* rgb_image = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM);
-    //raw_print(rgb_image, width, height);    
+    uint8_t* rgb_image = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM);  
     DataFrame df = get_df(rgb_image, width, height);
-    //print_df(df, width, height);
     k_means(df, width, height, 3, 2);
-    //stbi_image_free(rgb_image);
-    //rgb_image = (uint8_t *) malloc(width*height*CHANNEL_NUM);
-    //stbi_write_png("write_test1.png", width, height, CHANNEL_NUM, rgb_image, width*CHANNEL_NUM);
-
     return 1;
-    //exit(1);
     
 }
