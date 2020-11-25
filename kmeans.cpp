@@ -1,17 +1,21 @@
+#include <bits/stdc++.h>
+#include "cycletimer.h"
+#include <omp.h>
 #include <unistd.h>
 #include <algorithm>
 #include <cstdlib>
 #include <limits>
-#include <random>
+//#include <random>
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #define CHANNEL_NUM 3
-
+#define OMP_NESTED true
+using namespace std;
 struct Point;
-using DataFrame = std::vector<Point>;
+typedef std::vector<Point> DataFrame;
 
 struct Point {
     double x, y;     // coordinates
@@ -96,7 +100,7 @@ uint8_t *get_raw(std::vector<size_t> assignments, DataFrame& df){
 DataFrame print_df(DataFrame& points, int width, int height){
     int l = width*height;
     Point p;
-    printf("Size: %d\n", points.size());
+    //printf("Size: %d\n", points.size());
     for(int i = 0; i < l; i++){
         //printf("i: %d\n", i);
         p = points[i];
@@ -110,27 +114,31 @@ DataFrame print_df(DataFrame& points, int width, int height){
 DataFrame k_means(DataFrame& data, int width, int height,
                   size_t k,
                   size_t number_of_iterations) {
-  static std::random_device seed;
-  static std::mt19937 random_number_generator(seed());
-  std::uniform_int_distribution<size_t> indices(0, data.size() - 1);
+  //static std::random_device seed;
+  //static std::mt19937 random_number_generator(seed());
+  //std::uniform_int_distribution<size_t> indices(0, data.size() - 1);
 
   // Pick centroids as random points from the dataset.
   DataFrame means(k);
   int index;
   for (int i=0; i<k; i++) {
-    index = (int)(indices(random_number_generator)/CHANNEL_NUM);
+    //index = (int)(indices(random_number_generator)/CHANNEL_NUM);
+    index = i*(data.size()/k);
     means.at(i) = data[index];
   }
   //check means
   //printf("Means Size: %d\n", means.size());
   //for(int i=0; i<k; i++){ printf("Mean[%d] Index in Data: %f\n", i, means.at(i).x);}
   std::vector<size_t> assignments(data.size());
+  double best_distance;
+  size_t best_cluster,point,cluster;
   for(size_t iteration = 0; iteration < number_of_iterations; ++iteration) {
     // Find assignments.
-    for (size_t point = 0; point < data.size(); ++point) {
-      double best_distance = std::numeric_limits<double>::max();
-      size_t best_cluster = 0;
-      for (size_t cluster = 0; cluster < k; ++cluster) {
+    #pragma omp parallel for firstprivate (point, best_distance, best_cluster, cluster) shared(data)
+    for (point = 0; point < data.size(); ++point) {
+      best_distance = std::numeric_limits<double>::max();
+      best_cluster = 0;
+      for (cluster = 0; cluster < k; ++cluster) {
         double distance = data[point].color_distance(means[cluster]);
         //squared_l2_distance(data[point], means[cluster]);
         if (distance < best_distance) {
@@ -145,7 +153,7 @@ DataFrame k_means(DataFrame& data, int width, int height,
     DataFrame new_means(k);
     std::vector<size_t> counts(k, 0);
     for (size_t point = 0; point < data.size(); ++point) {
-      const auto cluster = assignments[point];
+      const int cluster = assignments[point];
       new_means[cluster].x += data[point].x;
       new_means[cluster].y += data[point].y;
       //also assign average color
@@ -158,7 +166,7 @@ DataFrame k_means(DataFrame& data, int width, int height,
     // Divide sums by counts to get new centroids.
     for (size_t cluster = 0; cluster < k; ++cluster) {
       // Turn 0/0 into 0/1 to avoid zero division.
-      const auto count = std::max<size_t>(1, counts[cluster]);
+      const int count = std::max<size_t>(1, counts[cluster]);
       means[cluster].x = new_means[cluster].x / count;
       means[cluster].y = new_means[cluster].y / count;
       //also for colors
@@ -188,7 +196,12 @@ int main(int argc, char **argv){
     //raw_print(rgb_image, width, height);    
     DataFrame df = get_df(rgb_image, width, height);
     //print_df(df, width, height);
-    k_means(df, width, height, 3, 2);
+    omp_set_num_threads(8);
+    double start_time_exc = currentSeconds();
+    k_means(df, width, height, 4, 2000);
+    double end_time = currentSeconds();
+    double duration_exc = end_time - start_time_exc;
+    fprintf(stdout, "Time: %f\n", duration_exc);
     //stbi_image_free(rgb_image);
     //rgb_image = (uint8_t *) malloc(width*height*CHANNEL_NUM);
     //stbi_write_png("write_test1.png", width, height, CHANNEL_NUM, rgb_image, width*CHANNEL_NUM);

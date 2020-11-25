@@ -1,13 +1,13 @@
-CXX = g++ -std=c++11
+CXX = g++ -std=c++11#-std=c++11
 OMP = -fopenmp
-CFLAGS = -O3 -g -Wall -openmp
+CFLAGS = -O3 -g -Wall -qopenmp
 
 ICC = icc -m64
-ICFLAGS = -O3 -g -Wall -openmp -offload-attribute-target=mic -DRUN_MIC
+ICFLAGS = -O3 -g -Wall -qopenmp #-qoffload-attribute-target=mic -DRUN_MIC
 
 all: kmeans
 
-wsp: kmeans.cpp cycletimer.cpp
+kmeans: kmeans.cpp cycletimer.cpp
 	            $(ICC) $(ICFLAGS) -o kmeans cycletimer.cpp kmeans.cpp $(OMP)
 
 clean:
