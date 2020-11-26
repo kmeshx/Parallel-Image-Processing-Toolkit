@@ -1,14 +1,43 @@
-CXX = g++ -std=c++11
-OMP = -fopenmp
-CFLAGS = -O3 -g -Wall -openmp
+EXECUTABLE := kmeans
+CU_FILES   := kmeans.cu
+CU_DEPS    :=
+CC_FILES   := 
 
-ICC = icc -m64
-ICFLAGS = -O3 -g -Wall -openmp -offload-attribute-target=mic -DRUN_MIC
 
-all: kmeans
+all: $(EXECUTABLE)
 
-wsp: kmeans.cpp cycletimer.cpp
-	            $(ICC) $(ICFLAGS) -o kmeans cycletimer.cpp kmeans.cpp $(OMP)
+###########################################################
+
+OBJDIR=objs
+CXX=g++ -std=c++11  -m64 
+CXXFLAGS=-O3 -Wall
+LDFLAGS=-L/usr/local/depot/cuda-10.2/lib64/ -lcudart
+NVCC=nvcc
+NVCCFLAGS=-O3 -m64 --gpu-architecture compute_61 -ccbin /usr/bin/gcc
+
+
+OBJS=$(OBJDIR)/kmeans.o 
+
+.PHONY: dirs clean
+
+all: $(EXECUTABLE)
+
+default: $(EXECUTABLE)
+
+dirs:
+	mkdir -p $(OBJDIR)/
 
 clean:
-	rm -f *~ kmeans
+	rm -rf $(OBJDIR) *.ppm *~ $(EXECUTABLE)
+
+
+$(EXECUTABLE): dirs $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+
+
+
+$(OBJDIR)/%.o: %.cpp
+	$(CXX) $< $(CXXFLAGS) -c -o $@
+
+$(OBJDIR)/%.o: %.cu
+	$(NVCC) $< $(NVCCFLAGS) -c -o $@
