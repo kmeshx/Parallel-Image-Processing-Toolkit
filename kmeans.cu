@@ -79,9 +79,10 @@ Points* get_df(uint8_t *rgb_image, int width, int height){
 }
 
 
-__device__ void update_mean(Point* means, int one_d_id, int total_num_points){
+__device__ void update_mean(Point* means, Point* data, int* assignment, int one_d_id, int total_num_points){
     
     counts = 0;
+    Point p;
     for (size_t point = 0; point < total_num_points; ++point) {
         if(assignment[point] == one_d_id){
             p.x += data[point].x;
@@ -115,10 +116,6 @@ __device__ void set_assignments(int* assignments, Point* means, int point){
     assignments[index_x * width + index_y] = assignment; 
 }
 
-__device__ void set_init_assignments(int* assignments, Point* means, int point){
-
-
-}
 /*
 TODO check data.size()
 */
@@ -130,7 +127,7 @@ __global__ void k_means_kernel(Point* &points, Point* means, int* assignments, i
     }
     __sync_threads();
     
-    for(int i = 0; i< iters; i++){
+    for(int i = 0; i< number_of_iterations; i++){
         if(point < total_num_points){
             set_assignments(assignments, means, point);
         }
@@ -139,7 +136,7 @@ __global__ void k_means_kernel(Point* &points, Point* means, int* assignments, i
         // TODO USE SCAN 
         int id = point;
         if(id < k){
-            update_mean(means, one_d_id, total_num_points);
+            update_mean(means, points, assignment, one_d_id, total_num_points);
         }
         __sync_threads();
     }
@@ -176,21 +173,18 @@ DataFrame print_df(DataFrame& points, int width, int height){
 void k_means(Points* &df, int width, int height,
                   size_t k,
                   size_t number_of_iterations) {
-    dim3 threadsPerBlock(BLOCK_SIDE, BLOCK_SIDE, 1);
+    dim3 threadsPerBlock(BLOCK_SIDE, 1, 1);
     const int NUM_BLOCKS_X = (width+threadsPerBlock.x-1)/threadsPerBlock.x;
-    const int NUM_BLOCKS_Y = (height+threadsPerBlock.y-1)/threadsPerBlock.y;
+    const int NUM_BLOCKS_Y = 1;
+    //(height+threadsPerBlock.y-1)/threadsPerBlock.y;
     dim3 gridDim(NUM_BLOCKS_X , NUM_BLOCKS_Y, 1);
+
     //TODO CUDA RANDOM MEANS and assignments 
-
-    static std::random_device seed;
-    static std::mt19937 random_number_generator(seed());
-
-
+    //static std::random_device seed;
+    //static std::mt19937 random_number_generator(seed());
     /*
     std::uniform_int_distribution<size_t> indices(0, data.size() - 1);
-  
     // Pick centroids as random points from the dataset.
-    
     int index;
     for (int i=0; i<k; i++) {
       index = (int)(indices(random_number_generator)/CHANNEL_NUM);
@@ -202,7 +196,6 @@ void k_means(Points* &df, int width, int height,
     size_t* assignments_device;
     uint8_t* new_img_device, new_img;
     int* init_mean_nums;
-    // = malloc(sizeof(Point)  );
     cudaMalloc(means_device, sizeof(Point) * k);
     cudaMalloc(points_device, sizeof(Point) * height * width );
     cudaMalloc(init_mean_nums, sizeof(int) * height * width );
