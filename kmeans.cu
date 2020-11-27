@@ -46,11 +46,13 @@ struct Point {
     }
 
     __device__ double color_distance(Point p){
-        return (p.r - r) * (p.r - r) + (p.b - b) * (p.b - b) + (p.g - g) * (p.g - g);
+        double v = (p.r - r) * (p.r - r) + (p.b - b) * (p.b - b) + (p.g - g) * (p.g - g);
+    
+        //printf("CD - r: %f, g: %f, b: %f, r2: %f, g2: %f, b2: %f, v: %f\n",
+        //r, g, b, p.r, p.b, p.g, v);
+        return v;
     }
 };
-
-
 void raw_print(uint8_t *rgb_image, int width, int height){
     int l = width*height*CHANNEL_NUM;
     float x, y;
@@ -62,7 +64,6 @@ void raw_print(uint8_t *rgb_image, int width, int height){
         x, y, rgb_image[i], rgb_image[i+1], rgb_image[i+2]);
     }
 }
-
 /*
 Point* get_df(uint8_t *rgb_image, int width, int height){
     
@@ -83,8 +84,10 @@ Point* get_df(uint8_t *rgb_image, int width, int height){
 }
 */
 
-__device__ void update_mean(Point* means, Point* data, size_t* assignments, int one_d_id, int total_num_points){
-    
+__global__ void update_mean(Point* means, Point* data, size_t* assignments, 
+    int total_num_points, int k){
+    int one_d_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if(one_d_id < k){
     int counts = 0;
     Point p;
     for (size_t point = 0; point < total_num_points; ++point) {
@@ -95,6 +98,7 @@ __device__ void update_mean(Point* means, Point* data, size_t* assignments, int 
             p.g += data[point].g;
             p.b += data[point].b;
             counts += 1;
+            
         }
     }
     means[one_d_id].x = p.x / counts;
@@ -102,66 +106,155 @@ __device__ void update_mean(Point* means, Point* data, size_t* assignments, int 
     means[one_d_id].r = p.r / counts;
     means[one_d_id].g = p.g / counts;
     means[one_d_id].b = p.b / counts;
+    if(one_d_id < k){printf("MV: %d, %f, %f, %f\n", one_d_id, 
+    means[one_d_id].r,means[one_d_id].g,means[one_d_id].b);}
+
+    //printf("P: x - %d, y - %d, r - %d, g - %d, b - %d, count - %d\n", p.x, p.y,
+//p.r, p.g, p.b, counts);
+    }
 }
 
 //assignments, means, height, width, index_x, index_y
-__device__ void set_assignments(Point* data, size_t*  assignments, Point* means, int point, int k, int width, int height ){
-    int assignment = -1;
-    double best_distance = (width * height + 1)*(width * height + 1);
+__global__ void set_assignments(Point* data, size_t*  assignments, Point* means, int k, int width, int height ){
+    int point = blockIdx.x * blockDim.x + threadIdx.x;
+    int total_num_points = width * height;
+    if(point < total_num_points){
+    //if(data[point].b != 0){printf("PCV: %d, %f\n", point, data[point].b);}
+    //if(point < k){printf("MV: %d, %f\n", point, means[point].b);}
+
+    int assignment = 0;
+    Point p,m;
+    double best_distance = CHANNEL_NUM*256*256;
     //std::numeric_limits<double>::max();
     size_t best_cluster = 0;
     for (size_t cluster = 0; cluster < k; ++cluster) {
-        double distance = data[point].color_distance(means[cluster]);
+        p = data[point];
+        m = means[cluster];
+        //printf("P: x - %d, y - %d, r - %d, g - %d, b - %d\n", p.x, p.y,
+//p.r, p.g, p.b);
+        //printf("M: x - %d, y - %d, r - %d, g - %d, b - %d\n", m.x, m.y,
+//m.r, m.g, m.b);
+        double distance = p.color_distance(m);
+        //printf("D: %d\n", distance);
         if (distance < best_distance) {
+            //if(point==0)printf("BD: %f, D: %f\n", best_distance, distance);
             best_distance = distance;
             best_cluster = cluster;
             assignment = best_cluster;
         }
     }
+    //if(point==0)printf("BD: %f\n", best_distance);
     assignments[point] = assignment; 
+    }
+}
+
+__global__ void fill_points(Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
+    uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){
+    int point = blockIdx.x * blockDim.x + threadIdx.x;
+    int total_num_points = width * height;
+    double x, y;
+    uint8_t r, g, b;
+    int point_channel = point*CHANNEL_NUM;
+    if(point<total_num_points){
+        int factor = (width*CHANNEL_NUM);
+        y = (double)(point_channel/factor);
+        x = (double)(point_channel%factor);
+        r = rgb_image[point_channel]; 
+        g = rgb_image[point_channel+1];
+        b = rgb_image[point_channel+2];
+        points[point] = (Point(x, y, r, g, b));
+    }
+    //if(points[t].b != 0){printf("PCV: %d, %f\n", point, points[t].b);}
+    
+}
+
+__global__ void set_new_img(Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
+    uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){
+    int point = blockIdx.x * blockDim.x + threadIdx.x;
+    int total_num_points = width * height;
+    Point p;
+    int c;
+    //TODO check len
+    if(point<total_num_points)
+    {
+        c = assignments[point];
+        p = points[c];
+        //printf("%d\n", point);
+        new_img[CHANNEL_NUM*point] = p.r;
+        new_img[CHANNEL_NUM*point+1] = p.g;
+        new_img[CHANNEL_NUM*point+2] = p.b;
+    }
+}
+
+__global__ void set_means_init(Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
+    uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){
+    int point = blockIdx.x * blockDim.x + threadIdx.x;
+    int t = (int) (point/CHANNEL_NUM);
+    if(point < k){
+        int init_ind = point*((height*width)/k);
+        means[point] = points[init_ind];
+    }
+    
+}
+void k_means_main(dim3 gridDim, dim3 threadsPerBlock, Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
+    uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){ 
+    int total_num_points = width*height;
+    fill_points<<<gridDim, threadsPerBlock>>>(points,means,assignments,number_of_iterations,
+    k,height,width,rgb_image,new_img,init_mean_nums);
+    cudaThreadSynchronize();
+    set_means_init<<<gridDim, threadsPerBlock>>>(points,means,assignments,number_of_iterations,
+    k,height,width,rgb_image,new_img,init_mean_nums);
+    cudaThreadSynchronize();
+    for(int i = 0; i< number_of_iterations; i++){
+        set_assignments<<<gridDim, threadsPerBlock>>>(points, assignments, means, 
+        k, width, height);
+        cudaThreadSynchronize();
+        update_mean<<<gridDim, threadsPerBlock>>>(means, points, assignments, 
+        total_num_points, k);
+        cudaThreadSynchronize();
+    }
+    set_new_img<<<gridDim, threadsPerBlock>>>(points,means,assignments,number_of_iterations,
+    k,height,width,rgb_image,new_img,init_mean_nums);
+    cudaThreadSynchronize();
 }
 
 /*
-TODO check data.size()
-*/
-__global__ void k_means_kernel(Point* &points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){
-    
+__global__ void k_means_kernel(Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
+    uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){ 
     int point = blockIdx.x * blockDim.x + threadIdx.x;
     //printf("%d", point);
     int total_num_points = width * height;
+    double x, y;
+    uint8_t r, g, b;
+    int point_channel = point*CHANNEL_NUM;
     if(point<total_num_points){
-        double x, y;
-        double r, g, b;
         int factor = (width*CHANNEL_NUM);
-
-        int point_channel = point *CHANNEL_NUM;
-        y = (float) (point_channel/factor);
-        x = (float) (point_channel%factor);
+        y = (double)(point_channel/factor);
+        x = (double)(point_channel%factor);
         r = rgb_image[point_channel]; 
         g = rgb_image[point_channel+1];
         b = rgb_image[point_channel+2];
         points[point] = (Point(x, y, r, g, b));
     }
     
-    __syncthreads();
+    cudaThreadSynchronize();
     if(point < k){
-        means[point] = Point();
-        //init_mean_nums[point];
+        means[point] = Point(0,0,255,255,255);
     }
-    __syncthreads();
+    cudaThreadSynchronize();
     
     for(int i = 0; i< number_of_iterations; i++){
         if(point < total_num_points){
             set_assignments(points, assignments, means, point, k, width, height);
         }
-        __syncthreads();
+        cudaThreadSynchronize();
         // now parallelize over clusters
         // TODO USE SCAN 
         int id = point;
         if(id < k){
             update_mean(means, points, assignments, id, total_num_points);
         }
-        __syncthreads();
+        cudaThreadSynchronize();
     }
 
     Point p;
@@ -171,14 +264,15 @@ __global__ void k_means_kernel(Point* &points, Point* means, size_t* assignments
     {
         c = assignments[point];
         p = points[c];
+        //printf("%d\n", point);
         new_img[CHANNEL_NUM*point] = p.r;
         new_img[CHANNEL_NUM*point+1] = p.g;
         new_img[CHANNEL_NUM*point+2] = p.b;
 
     }
- 
+    cudaThreadSynchronize();
 }
-
+*/
 /*
 void print_df(Points* &points, int width, int height){
     int l = width*height;
@@ -241,10 +335,10 @@ void k_means(uint8_t* rgb_image, int width, int height,
     //curandGenerator_t gen;
     //CURAND_CALL(curandGenerateUniform(gen, init_mean_nums, height * width));
     //(Point* &points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, uint8_t* new_img, int* init_mean_nums)
-    k_means_kernel<<<gridDim, threadsPerBlock>>>(points_device, means_device, assignments_device, 
-                                                number_of_iterations, k,  height, width, rgb_img_device, new_img_device, init_mean_nums);
+    k_means_main(gridDim, threadsPerBlock, points_device, means_device, assignments_device, 
+    number_of_iterations, k,  height, width, rgb_img_device, new_img_device, init_mean_nums);
     printf("DONE");
-    cudaMemcpy(new_img, rgb_img_device, sizeof(uint8_t) * height * width * CHANNEL_NUM, cudaMemcpyDeviceToHost);
+    cudaMemcpy(new_img, new_img_device, sizeof(uint8_t) * height * width * CHANNEL_NUM, cudaMemcpyDeviceToHost);
 
     //cudaMemcpy(new_img, new_img_device, sizeof(Point) * height * width * CHANNEL_NUM, cudaMemcpyDeviceToHost);
     stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
@@ -260,7 +354,7 @@ int main(int argc, char **argv){
     uint8_t* rgb_image = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM);  
     printf("READ");
     //Point* df = get_df(rgb_image, width, height);
-    k_means(rgb_image, width, height, 3, 2);
+    k_means(rgb_image, width, height, 4, 20);
     return 1;
     
 }
