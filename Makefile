@@ -1,7 +1,7 @@
 EXECUTABLE := kmeans
 CU_FILES   := kmeans.cu
 CU_DEPS    :=
-CC_FILES   := 
+CC_FILES   := cycletimer.cpp
 
 
 all: $(EXECUTABLE)
@@ -16,7 +16,7 @@ NVCC=nvcc
 NVCCFLAGS=-O3 -m64 --gpu-architecture compute_61 -ccbin /usr/bin/gcc
 
 
-OBJS=$(OBJDIR)/kmeans.o 
+OBJS=$(OBJDIR)/kmeans.o $(OBJDIR)/cycletimer.o 
 
 .PHONY: dirs clean
 

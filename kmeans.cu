@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <limits>
+#include "exclusiveScan.cu_inl"
+#include "cycletimer.h"
 //#include <random>
 #include <vector>
 #include <cuda.h>
@@ -12,7 +14,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #define CHANNEL_NUM 3
-#define BLOCK_SIDE 5
+#define BLOCK_SIDE 1024
+#define BLOCK_SIZE 1024
+#define SCAN_BLOCK_DIM BLOCK_SIZE 
 
 struct Point;
 //using DataFrame = std::vector<Point>;
@@ -106,8 +110,8 @@ __global__ void update_mean(Point* means, Point* data, size_t* assignments,
     means[one_d_id].r = p.r / counts;
     means[one_d_id].g = p.g / counts;
     means[one_d_id].b = p.b / counts;
-    if(one_d_id < k){printf("MV: %d, %f, %f, %f\n", one_d_id, 
-    means[one_d_id].r,means[one_d_id].g,means[one_d_id].b);}
+    //: %d, %f, %f, %f\n", one_d_id, 
+    //means[one_d_id].r,means[one_d_id].g,means[one_d_id].b);}
 
     //printf("P: x - %d, y - %d, r - %d, g - %d, b - %d, count - %d\n", p.x, p.y,
 //p.r, p.g, p.b, counts);
@@ -164,7 +168,7 @@ __global__ void fill_points(Point* points, Point* means, size_t* assignments, in
         b = rgb_image[point_channel+2];
         points[point] = (Point(x, y, r, g, b));
     }
-    //if(points[t].b != 0){printf("PCV: %d, %f\n", point, points[t].b);}
+    //if(points[t].b != 0){//printf("PCV: %d, %f\n", point, points[t].b);}
     
 }
 
@@ -179,7 +183,7 @@ __global__ void set_new_img(Point* points, Point* means, size_t* assignments, in
     {
         c = assignments[point];
         p = means[c];
-        //printf("%d\n", point);
+        ////printf("%d\n", point);
         new_img[CHANNEL_NUM*point] = p.r;
         new_img[CHANNEL_NUM*point+1] = p.g;
         new_img[CHANNEL_NUM*point+2] = p.b;
@@ -200,38 +204,38 @@ __global__ void set_means_init(Point* points, Point* means, size_t* assignments,
         if(point==3) means[point] = Point(0,0,127,80,42);
         */
         m = means[point];
-        printf("M: x - %f, y - %f, r - %f, g - %f, b - %f\n", m.x, m.y,
-m.r, m.g, m.b);
+        //printf("M: x - %f, y - %f, r - %f, g - %f, b - %f\n", m.x, m.y,
+//m.r, m.g, m.b);
     }
     
 }
-void k_means_main(dim3 gridDim, dim3 threadsPerBlock, Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
+void k_means_main(dim3 kgridDim, dim3 kthreadsPerBlock, dim3 gridDim, dim3 threadsPerBlock, Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
     uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){ 
     int total_num_points = width*height;
     fill_points<<<gridDim, threadsPerBlock>>>(points,means,assignments,number_of_iterations,
     k,height,width,rgb_image,new_img,init_mean_nums);
-    cudaThreadSynchronize();
-    set_means_init<<<gridDim, threadsPerBlock>>>(points,means,assignments,number_of_iterations,
+    //cudaThreadSynchronize();
+    set_means_init<<<kgridDim, kthreadsPerBlock>>>(points,means,assignments,number_of_iterations,
     k,height,width,rgb_image,new_img,init_mean_nums);
-    cudaThreadSynchronize();
+    //cudaThreadSynchronize();
     for(int i = 0; i< number_of_iterations; i++){
         set_assignments<<<gridDim, threadsPerBlock>>>(points, assignments, means, 
         k, width, height);
-        cudaThreadSynchronize();
-        update_mean<<<gridDim, threadsPerBlock>>>(means, points, assignments, 
+        //cudaThreadSynchronize();
+        update_mean<<<kgridDim, kthreadsPerBlock>>>(means, points, assignments, 
         total_num_points, k);
-        cudaThreadSynchronize();
+        //cudaThreadSynchronize();
     }
     set_new_img<<<gridDim, threadsPerBlock>>>(points,means,assignments,number_of_iterations,
     k,height,width,rgb_image,new_img,init_mean_nums);
-    cudaThreadSynchronize();
+    //cudaThreadSynchronize();
 }
 
 /*
 __global__ void k_means_kernel(Point* points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, 
     uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){ 
     int point = blockIdx.x * blockDim.x + threadIdx.x;
-    //printf("%d", point);
+    ////printf("%d", point);
     int total_num_points = width * height;
     double x, y;
     uint8_t r, g, b;
@@ -273,7 +277,7 @@ __global__ void k_means_kernel(Point* points, Point* means, size_t* assignments,
     {
         c = assignments[point];
         p = points[c];
-        //printf("%d\n", point);
+        ////printf("%d\n", point);
         new_img[CHANNEL_NUM*point] = p.r;
         new_img[CHANNEL_NUM*point+1] = p.g;
         new_img[CHANNEL_NUM*point+2] = p.b;
@@ -286,13 +290,13 @@ __global__ void k_means_kernel(Point* points, Point* means, size_t* assignments,
 void print_df(Points* &points, int width, int height){
     int l = width*height;
     Point p;
-    printf("Size: %d\n", points.size());
+    //printf("Size: %d\n", points.size());
     for(int i = 0; i < l; i++){
         p = points[i];
-        printf("X: %f, Y: %f, R: %f, G: %f, B: %f\n",
+        //printf("X: %f, Y: %f, R: %f, G: %f, B: %f\n",
                 p.x, p.y, p.r, p.g, p.b);
     }
-    printf("Printed DF\n");
+    //printf("Printed DF\n");
 }
 */
 
@@ -305,6 +309,9 @@ void k_means(uint8_t* rgb_image, int width, int height,
     const int NUM_BLOCKS_Y = 1;
     //(height+threadsPerBlock.y-1)/threadsPerBlock.y;
     dim3 gridDim(NUM_BLOCKS_X , NUM_BLOCKS_Y, 1);
+    int KBLOCK_SIDE = k;
+    dim3 kgridDim(1 , NUM_BLOCKS_Y, 1);
+    dim3 kthreadsPerBlock(KBLOCK_SIDE, 1, 1);
     
     //TODO CUDA RANDOM MEANS and assignments 
     //static std::random_device seed;
@@ -326,7 +333,7 @@ void k_means(uint8_t* rgb_image, int width, int height,
     uint8_t* rgb_img_device;
     uint8_t* new_img = (uint8_t*)malloc(sizeof(uint8_t) * height * width * CHANNEL_NUM);
     int* init_mean_nums;
-    printf("ENTERED");
+    //printf("ENTERED");
     cudaMalloc(&means_device, sizeof(Point) * k);
     cudaMalloc(&points_device, sizeof(Point) * height * width );
     cudaMalloc(&init_mean_nums, sizeof(int) * k );
@@ -335,7 +342,7 @@ void k_means(uint8_t* rgb_image, int width, int height,
     cudaMalloc(&rgb_img_device, sizeof(uint8_t) * height * width*CHANNEL_NUM );
     
     cudaMemcpy(rgb_img_device, rgb_image, sizeof(uint8_t) * height * width*CHANNEL_NUM, cudaMemcpyHostToDevice);
-    printf("COPIED");
+    //printf("COPIED");
     //cudaMemcpy(&new_img_device, new_img, sizeof(uint8_t) * height * width, cudaMemcpyDeviceToHost);
     /* Set seed */
     //CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, 1234ULL));
@@ -344,26 +351,31 @@ void k_means(uint8_t* rgb_image, int width, int height,
     //curandGenerator_t gen;
     //CURAND_CALL(curandGenerateUniform(gen, init_mean_nums, height * width));
     //(Point* &points, Point* means, size_t* assignments, int number_of_iterations, int k, int height, int width, uint8_t* new_img, int* init_mean_nums)
-    k_means_main(gridDim, threadsPerBlock, points_device, means_device, assignments_device, 
+    double start_time_exc = currentSeconds();
+    k_means_main(kgridDim, kthreadsPerBlock, gridDim, threadsPerBlock, points_device, means_device, assignments_device, 
     number_of_iterations, k,  height, width, rgb_img_device, new_img_device, init_mean_nums);
-    printf("DONE");
+    //printf("DONE");
+    double end_time = currentSeconds();
+    double duration_exc = end_time - start_time_exc;
+    printf("Time: %f\n", duration_exc);
     cudaMemcpy(new_img, new_img_device, sizeof(uint8_t) * height * width * CHANNEL_NUM, cudaMemcpyDeviceToHost);
 
     //cudaMemcpy(new_img, new_img_device, sizeof(Point) * height * width * CHANNEL_NUM, cudaMemcpyDeviceToHost);
     stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
-    printf("Finished k-means\n");
+    //printf("Finished k-means\n");
 }
 
-
 int main(int argc, char **argv){
-    printf("Starting off ... \n");
+    //printf("Starting off ... \n");
     const char *img_file = "cs_test1.jpg";
     int width, height, bpp;
-    printf("READING");
+    //printf("READING");
     uint8_t* rgb_image = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM);  
-    printf("READ");
+    //printf("READ");
     //Point* df = get_df(rgb_image, width, height);
-    k_means(rgb_image, width, height, 4, 20);
+    
+    k_means(rgb_image, width, height, 4, 2000);
+    
     return 1;
     
 }
