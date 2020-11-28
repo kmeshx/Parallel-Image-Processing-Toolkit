@@ -153,7 +153,7 @@ __global__ void fill_points(Point* points, Point* means, size_t* assignments, in
     int point = blockIdx.x * blockDim.x + threadIdx.x;
     int total_num_points = width * height;
     double x, y;
-    uint8_t r, g, b;
+    double r, g, b;
     int point_channel = point*CHANNEL_NUM;
     if(point<total_num_points){
         int factor = (width*CHANNEL_NUM);
@@ -178,7 +178,7 @@ __global__ void set_new_img(Point* points, Point* means, size_t* assignments, in
     if(point<total_num_points)
     {
         c = assignments[point];
-        p = points[c];
+        p = means[c];
         //printf("%d\n", point);
         new_img[CHANNEL_NUM*point] = p.r;
         new_img[CHANNEL_NUM*point+1] = p.g;
@@ -190,9 +190,18 @@ __global__ void set_means_init(Point* points, Point* means, size_t* assignments,
     uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){
     int point = blockIdx.x * blockDim.x + threadIdx.x;
     int t = (int) (point/CHANNEL_NUM);
+    Point m;
     if(point < k){
         int init_ind = point*((height*width)/k);
         means[point] = points[init_ind];
+        /*if(point==0) means[point] = Point(0,0,89,116,58);
+        if(point==1) means[point] = Point(0,0,215,192,123);
+        if(point==2) means[point] = Point(0,0,50,50,29);
+        if(point==3) means[point] = Point(0,0,127,80,42);
+        */
+        m = means[point];
+        printf("M: x - %f, y - %f, r - %f, g - %f, b - %f\n", m.x, m.y,
+m.r, m.g, m.b);
     }
     
 }
