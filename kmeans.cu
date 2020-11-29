@@ -63,26 +63,6 @@ void raw_print(uint8_t *rgb_image, int width, int height){
     }
 }
 
-/*
-Point* get_df(uint8_t *rgb_image, int width, int height){
-    
-    int l = width*height*CHANNEL_NUM;
-    Point* points = (Point*)malloc(sizeof(Point) * width * height);
-    double x, y;
-    double r, g, b;
-    int factor = (width*CHANNEL_NUM);
-    for(int i = 0; i < l; i+=CHANNEL_NUM){
-        y = (float) (i/factor);
-        x = (float) (i%factor);
-        r = rgb_image[i]; 
-        g = rgb_image[i+1];
-        b = rgb_image[i+2];
-        points[i] = (Point(x, y, r, g, b));
-    }
-    return points;
-}
-*/
-
 __device__ void update_mean(Point* means, Point* data, size_t* assignments, int one_d_id, int total_num_points){
     
     int counts = 0;

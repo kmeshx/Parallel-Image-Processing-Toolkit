@@ -23,7 +23,7 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
     int total_pts = width * height;
     double max_var = -1;
     uint8_t *new_img = (uint8_t *) malloc(total_pts * sizeof(uint8_t));
-
+    
     for(int i=0; i< MAX_INTENSITY; i++){
         histogram[i] = 0.0;
     }

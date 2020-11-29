@@ -9,6 +9,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #define CHANNEL_NUM 3
+#define OMP_NESTED true
+
 
 struct Point;
 using DataFrame = std::vector<Point>;
