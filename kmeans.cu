@@ -32,15 +32,23 @@ struct Point {
         r(0.0),
         g(0.0),
         b(0.0),
-        count(0) {}
-        
+        count(1) {}
+    
+    __device__ __host__ Point(int count) : 
+        x(0), 
+        y(0),
+        r(0),
+        g(0),
+        b(0),
+        count(count) {}
+
     __device__ __host__ Point(double x, double y, double r, double g, double b) : 
         x(x), 
         y(y),
         r(r),
         g(g),
         b(b),
-        count(0) {}
+        count(1) {}
 
     __device__ double euclid_distance(Point p) {
         return (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
@@ -55,7 +63,10 @@ struct Point {
         r+=p.r;
         g+=p.g;
         b+=p.b;
-        count+=1;
+        count+=p.count;
+        //int d = 1;
+        //if(p.x == 0 && p.y == 0 && p.r == 0 && p.g == 0 && p.b == 0) d=0;
+        //count = count + p.count + d;
     }
 };
 
@@ -198,22 +209,28 @@ int total_num_points, int k, int cluster, Point *data_scratch){
             data_scratch[id] = data[id];
         }
         else{
-            data_scratch[id] = Point();
+            data_scratch[id] = Point(0);
         }
+        //printf("ID: %d, p.r: %f\n", id, data_scratch[id].r);
     }
 }
 
 __global__ void set_final_means(Point* means, Point* data, size_t* assignments, 
-    int total_num_points, int k, Point *p){
+    int total_num_points, int cluster, int k, Point *p){
 
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-    if(id < k){
-        if(assignments[total_num_points-1]==id){
+    if(id == cluster){
+        if(assignments[total_num_points-1]==cluster){
+            //printf("Sp - id %d x %f, y %f, r %f, g %f, b %f, count %d\n", 
+        //id, p->x, p->y, p->r, p->g, p->b, p->count);
             Point pp = *p;
             pp.sum(data[total_num_points]);
             *p = pp;
+            //printf("Sp - id %d x %f, y %f, r %f, g %f, b %f, count %d\n", 
+        //id, p->x, p->y, p->r, p->g, p->b, p->count);
         }
-        
+        //printf("P - id %d x %f, y %f, r %f, g %f, b %f, count %d\n", 
+        //id, p->x, p->y, p->r, p->g, p->b, p->count);
         means[id].x = p->x / p->count;
         means[id].y = p->y / p->count;
         means[id].r = p->r / p->count;
@@ -241,7 +258,7 @@ void update_mean(Point* means, Point* data, size_t* assignments,
         //total_num_points-1 index has sum excluding last element
         //printf("Set final means\n");
         set_final_means<<<gridDim, threadsPerBlock>>>(means, data, assignments, 
-        total_num_points, k, &data_scratch[total_num_points-1]);
+        total_num_points, cluster, k, &data_scratch[total_num_points-1]);
         //printf("Means Set\n");
     }
 }
