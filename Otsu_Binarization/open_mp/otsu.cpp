@@ -20,30 +20,43 @@
 
 void scan_parallel(double* &cum_histogram, double* &cum_sum){
     int i, d, k;
+    for(i=0; i<5; i++)
+    {
+        std::cout<< cum_histogram[i]<<" ";
+    }
+    std::cout<<"\n";
+    for(d = 1; d<MAX_INTENSITY; d<<=1){
 
-    // up sweep
-    for(d = 0; d<num_levels; d++){
         #pragma omp parallel for shared(cum_histogram, cum_sum)
-        for(k=0; k<MAX_INTENSITY/1<<(d+1); k++){
-            cum_histogram[k + pow(2, d+1) -1] = cum_histogram[k+pow(2, d) -1] + cum_histogram[k+pow(2, d+1)-1];
-            cum_sum[k + 1<<(d+1) -1] = cum_sum[k+(1<<d) -1] + cum_sum[k+ 1<<(d+1)-1];
+        for(k=0; k<MAX_INTENSITY; k+=2*d){
+            cum_histogram[2*d+k-1] = cum_histogram[2*d+k-1] + cum_histogram[d+k-1] ;
+            cum_sum[2*d+k-1] = cum_sum[2*d+k-1] + cum_sum[d+k-1];
         }
     }
-
+    
     // down sweep 
     double tmp_sum, tmp_histogram;
-    a[MAX_INTENSITY-1] = 0;
-    for (d = num_levels-1; d=0; d--) {
+    return;
+    cum_histogram[MAX_INTENSITY-1] = 0;
+    cum_sum[MAX_INTENSITY-1] = 0;
+    for (d = MAX_INTENSITY/2; d>0; d>>=1) {
         #pragma omp parallel for shared(cum_histogram, cum_sum)
-        for (k = 0; i < MAX_INTENSITY/1<<(d+1); i++){
-            tmp_histogram = cum_histogram[k + 1<<d];
-            tmp_sum = cum_sum[k + 1<<d];
-            cum_histogram[k + 1<<d -1] = cum_histogram[k+1<<(d+1) -1];
-            cum_histogram[k + 1<<(d+1) -1] = tmp_histogram + cum_histogram[k+1<<(d+1) -1];
-            cum_sum[k + 1<<d -1] = cum_sum[k+1<<(d+1) -1];
-            cum_sum[k + 1<<(d+1) -1] = tmp_sum + cum_sum[k+1<<(d+1) -1];
+        for (k = 0; k < MAX_INTENSITY; k += 2*d){
+            tmp_histogram = cum_histogram[d+k-1];
+            tmp_sum = cum_sum[d+k-1];
+            cum_histogram[d+k-1] = cum_histogram[2*d + k-1];
+            cum_histogram[2*d+k-1] = tmp_histogram + cum_histogram[2*d + k-1];
+            cum_sum[d+k-1] = cum_sum[2*d + k-1];
+            cum_sum[2*d+k-1] = tmp_sum + cum_sum[2*d + k-1];
         }
     }
+    for(i=0; i<5; i++)
+    {
+        std::cout<<cum_histogram[i]<<" ";
+    }
+    std::cout<<"\n";
+    
+
 
 }
 
@@ -51,8 +64,8 @@ void scan_parallel(double* &cum_histogram, double* &cum_sum){
 int otsu_binarization(uint8_t* &gray_img, int width, int height){
     // Pick centroids as random points from the dataset.
     double histogram[MAX_INTENSITY];
-    double cum_histogram[MAX_INTENSITY];
-    double cum_sum[MAX_INTENSITY];
+    double* cum_histogram = (double*)malloc(sizeof(double) * MAX_INTENSITY);
+    double* cum_sum = (double*)malloc(sizeof(double) * MAX_INTENSITY);
 
     
     //vector<int> histogram(MAX_INTENSITY); //gray scale image
@@ -90,7 +103,6 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
         cum_sum[i] = i * histogram[i];
     }
 
-    int num_levels = ceil(log(MAX_INTENSITY)/log(2));
     scan_parallel(cum_histogram, cum_sum);
 
     #pragma omp parallel for private(p1_num, p2_num, p1_sum, p2_sum, p1_mu, p2_mu, var, mu_diff) shared(cum_histogram, threshold, total_pts, total_sum) 
@@ -137,3 +149,4 @@ int main(int argc, char **argv){
     otsu_binarization(gray_img, width, height);
     return 1;
 }
+
