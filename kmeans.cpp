@@ -13,6 +13,9 @@
 #include "stb_image_write.h"
 #define CHANNEL_NUM 3
 #define OMP_NESTED true
+#define NT 16
+#define CK 3000
+#define ITER 2048
 using namespace std;
 struct Point;
 typedef std::vector<Point> DataFrame;
@@ -151,8 +154,9 @@ DataFrame k_means(DataFrame& data, int width, int height,
   size_t best_cluster,point,cluster;
   for(size_t iteration = 0; iteration < number_of_iterations; ++iteration) {
     // Find assignments.
-    #pragma omp parallel for firstprivate (point, best_distance, best_cluster, cluster) shared(data,assignments,means)
+    #pragma omp parallel for num_threads(NT) firstprivate (point, best_distance, best_cluster, cluster) shared(data,assignments,means)
     for (point = 0; point < data.size(); ++point) {
+      //printf("Thread ID: %d\n", omp_get_thread_num());
       best_distance = std::numeric_limits<double>::max();
       best_cluster = 0;
       for (cluster = 0; cluster < k; ++cluster) {
@@ -189,7 +193,7 @@ DataFrame k_means(DataFrame& data, int width, int height,
 	sum_g=0;
 	sum_b=0;
 	count=0;
-    	#pragma omp parallel for reduction(+:count,sum_x,sum_y,sum_r,sum_g,sum_b) shared(data,assignments)
+    	#pragma omp parallel for num_threads(NT) reduction(+:count,sum_x,sum_y,sum_r,sum_g,sum_b) shared(data,assignments)
 	for (size_t point = 0; point < data.size(); ++point) {
 	    const int cur_c = assignments[point];
 	    if(cur_c != cluster) continue;
@@ -224,7 +228,7 @@ DataFrame k_means(DataFrame& data, int width, int height,
     }*/
 
     // Divide sums by counts to get new centroids.
-    #pragma omp parallel for firstprivate (cluster) shared(new_means,means,counts)
+    #pragma omp parallel for num_threads(NT) firstprivate (cluster) shared(new_means,means,counts)
     for (size_t cluster = 0; cluster < k; ++cluster) {
       // Turn 0/0 into 0/1 to avoid zero division.
       const int count = std::max<size_t>(1, counts[cluster]);
@@ -257,9 +261,9 @@ int main(int argc, char **argv){
     //raw_print(rgb_image, width, height);
     DataFrame df = get_df(rgb_image, width, height);
     //print_df(df, width, height);
-    omp_set_num_threads(4);
+    omp_set_num_threads(NT);
     double start_time_exc = currentSeconds();
-    k_means(df, width, height, 3, 32);
+    k_means(df, width, height, CK, ITER);
     double end_time = currentSeconds();
     double duration_exc = end_time - start_time_exc;
     fprintf(stdout, "Time: %f\n", duration_exc);
