@@ -1,9 +1,9 @@
 CXX = g++ -std=c++11#-std=c++11
 OMP = -fopenmp -lgomp
-CFLAGS = -O3 -g -Wall -openmp
+CFLAGS = -O3 -g -Wall -qopenmp
 
 ICC = icc -m64
-ICFLAGS = -O3 -g -Wall -openmp #-offload-attribute-target=mic -DRUN_MIC
+ICFLAGS = -O3 -g -Wall -qopenmp #-offload-attribute-target=mic -DRUN_MIC
 
 all: kmeans
 
