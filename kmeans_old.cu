@@ -22,16 +22,16 @@
 
 struct Point;
 struct Point {
-    unsigned int x, y;     // coordinates
-    unsigned int r, g, b;
+    double x, y;     // coordinates
     int count;     // no default cluster
+    double r, g, b;
 
     __device__ __host__ Point() : 
-        x(0), 
-        y(0),
-        r(0),
-        g(0),
-        b(0),
+        x(0.0), 
+        y(0.0),
+        r(0.0),
+        g(0.0),
+        b(0.0),
         count(1) {}
     
     __device__ __host__ Point(int count) : 
@@ -42,7 +42,7 @@ struct Point {
         b(0),
         count(count) {}
 
-    __device__ __host__ Point(unsigned int x, unsigned int y, uint8_t r, uint8_t g, uint8_t b) : 
+    __device__ __host__ Point(double x, double y, double r, double g, double b) : 
         x(x), 
         y(y),
         r(r),
@@ -54,18 +54,19 @@ struct Point {
         return (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
     }
     __device__ double color_distance(Point p){
-        double v = ((double)((p.r - r) * (p.r - r))) + 
-        ((double)((p.g - g) * (p.g - g))) +
-        ((double)((p.b - b) * (p.b - b)));
+        double v = (p.r - r) * (p.r - r) + (p.b - b) * (p.b - b) + (p.g - g) * (p.g - g);
         return v;
     }
-    __inline__ __device__ void sum(Point p){
+    __device__ __host__ void sum(Point p){
         x+=p.x;
         y+=p.y;
         r+=p.r;
-        b+=p.b;
         g+=p.g;
+        b+=p.b;
         count+=p.count;
+        //int d = 1;
+        //if(p.x == 0 && p.y == 0 && p.r == 0 && p.g == 0 && p.b == 0) d=0;
+        //count = count + p.count + d;
     }
 };
 
@@ -156,13 +157,13 @@ void exclusive_scan(Point* device_data, int length)
     length = nextPow2(length);
     int blocks = (length+threadsPerBlock - 1) / threadsPerBlock;
     set_extras_zeroes_kernel<<<blocks, threadsPerBlock>>>(device_data, length, og_length);
-    //cudaThreadSynchronize();
+    cudaThreadSynchronize();
     //upsweep phase
     for (int twod = 1; twod < length; twod*=2){
         int twod1 = twod*2;
         blocks = (length/twod + threadsPerBlock) / threadsPerBlock;       
         upsweep_kernel<<<blocks, threadsPerBlock>>>(device_data, length, twod, twod1);
-        //cudaThreadSynchronize();
+        cudaThreadSynchronize();
     }     
     const Point zero_const = Point();
     cudaMemcpy(&device_data[length-1], &zero_const, sizeof(Point),cudaMemcpyHostToDevice); 
@@ -172,7 +173,7 @@ void exclusive_scan(Point* device_data, int length)
         int twod1 = twod*2;
         blocks = (length/twod + threadsPerBlock) / threadsPerBlock;
         downsweep_kernel<<<blocks, threadsPerBlock>>>(device_data, length, twod, twod1, og_length);
-        //cudaThreadSynchronize();
+        cudaThreadSynchronize();
     }
 }
 
@@ -220,10 +221,16 @@ __global__ void set_final_means(Point* means, Point* data, size_t* assignments,
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if(id == cluster){
         if(assignments[total_num_points-1]==cluster){
+            //printf("Sp - id %d x %f, y %f, r %f, g %f, b %f, count %d\n", 
+        //id, p->x, p->y, p->r, p->g, p->b, p->count);
             Point pp = *p;
-            pp.sum(data[total_num_points-1]);
+            pp.sum(data[total_num_points]);
             *p = pp;
+            //printf("Sp - id %d x %f, y %f, r %f, g %f, b %f, count %d\n", 
+        //id, p->x, p->y, p->r, p->g, p->b, p->count);
         }
+        //printf("P - id %d x %f, y %f, r %f, g %f, b %f, count %d\n", 
+        //id, p->x, p->y, p->r, p->g, p->b, p->count);
         means[id].x = p->x / p->count;
         means[id].y = p->y / p->count;
         means[id].r = p->r / p->count;
@@ -323,13 +330,13 @@ __global__ void fill_points(Point* points, Point* means, size_t* assignments, in
     uint8_t* rgb_image, uint8_t* new_img, int* init_mean_nums){
     int point = blockIdx.x * blockDim.x + threadIdx.x;
     int total_num_points = width * height;
-    unsigned int x, y;
-    uint8_t r, g, b;
+    double x, y;
+    double r, g, b;
     int point_channel = point*CHANNEL_NUM;
     if(point<total_num_points){
         int factor = (width*CHANNEL_NUM);
-        y = (unsigned int)(point_channel/factor);
-        x = (unsigned int)(point_channel%factor);
+        y = (double)(point_channel/factor);
+        x = (double)(point_channel%factor);
         r = rgb_image[point_channel]; 
         g = rgb_image[point_channel+1];
         b = rgb_image[point_channel+2];
