@@ -3,8 +3,10 @@
 #include <cstdlib>
 #include <limits>
 #include <stdio.h>
-#include "exclusiveScan.cu_inl"
+//#include "exclusiveScan.cu_inl"
 #include "cycletimer.h"
+//#include "scan.cu"
+//#include <random>
 #include <vector>
 #include <cuda.h>
 #include <cuda_runtime.h>
