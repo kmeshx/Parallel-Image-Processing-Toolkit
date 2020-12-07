@@ -117,9 +117,10 @@ __inline__ __device__ void init_point_cells(uint *addr, uint val){
 
 }
 
-__inline__ __device__ void vinit_point_cells(volatile uint *addr, uint val){
+__inline__ __device__ void vinit_point_cells(uint *addr, uint val){
     for(int i = 0; i < NUM_FIELDS; i++){
         //*(addr+i) = val;
+        printf("addr: %p\n", addr);
     }
 
 }
@@ -132,7 +133,7 @@ __inline__ __device__ void point_to_cells(uint *from, uint *to){
 
 }
 
-__inline__ __device__ void vpoint_to_cells(volatile uint *from, volatile uint *to){
+__inline__ __device__ void vpoint_to_cells(uint *from, uint *to){
     for(int i = 0; i < NUM_FIELDS; i++){
         //printf("F: %p, T: %p\n", *(from+i), *(to+i));
         *(to+i) = *(from+i);
@@ -140,13 +141,13 @@ __inline__ __device__ void vpoint_to_cells(volatile uint *from, volatile uint *t
 
 }
 
-__inline__ __device__ void sum_point_cells(volatile uint *dest, volatile uint *val){
+__inline__ __device__ void sum_point_cells(uint *dest, uint *val){
     for(int i = 0; i < NUM_FIELDS; i++){
         *(dest+i) = (*(dest+i)) + (*(val+i));
     }
 }
 
-__inline__ __device__ void diff_point_cells(volatile uint *dest, volatile uint *val){
+__inline__ __device__ void diff_point_cells(uint *dest, uint *val){
     for(int i = 0; i < NUM_FIELDS; i++){
         *(dest+i) = (*(dest+i)) - (*(val+i));
     }
@@ -157,37 +158,38 @@ __inline__ __device__ void diff_point_cells(volatile uint *dest, volatile uint *
 //-------SCAN IMPLEMENTATION-------//
 //Almost the same as naive scan1Inclusive, but doesn't need __syncthreads()
 //assuming size <= WARP_SIZE
-inline __device__ volatile uint *warpScanInclusive(int threadIndex, volatile uint *idata_addr, volatile uint *s_Data, uint size){
+inline __device__ uint *warpScanInclusive(int threadIndex, uint *idata_addr,
+ uint *s_Data, uint size){
     // Note some of the calculations are obscure because they are optimized.
     // For example, (threadIndex & (size - 1)) computes threadIndex % size,
     // which works, assuming size is a power of 2.
-    printf("eh\n");
+    //printf("eh\n");
     uint pos = 2 * threadIndex - (threadIndex & (size - 1));
-    volatile uint *pos_addr = s_Data + pos*NUM_FIELDS;
+    uint *pos_addr = s_Data + pos*NUM_FIELDS;
     //s_Data[pos] = 0;
-    printf("sdata pos addr: %p\n", pos_addr);
-    //vinit_point_cells(pos_addr, 0);
+    //printf("sdata pos addr: %p\n", s_Data);
+    vinit_point_cells(pos_addr, 0);
     pos += size;
     //s_Data[pos] = idata;
     //vpoint_to_cells(idata_addr, pos_addr);
 
     for(uint offset = 1; offset < size; offset <<= 1){
         //s_Data[pos] += s_Data[pos - offset];
-        //sum_point_cells(pos_addr, s_Data+(pos-offset)*NUM_FIELDS);
+        //sum_point_cells(pos_addr, s_Data+((pos-offset)*NUM_FIELDS));
     }
     return pos_addr;
 }
 
 
-inline __device__ volatile uint *warpScanExclusive(int threadIndex, volatile uint *idata, 
-volatile uint *sScratch, uint size){
-    volatile uint *pos_addr = warpScanInclusive(threadIndex, idata, sScratch, size);
+inline __device__ uint *warpScanExclusive(int threadIndex, uint *idata,
+ uint *sScratch, uint size){
+    uint *pos_addr = warpScanInclusive(threadIndex, idata, sScratch, size);
     diff_point_cells(pos_addr, idata);
     return pos_addr;
 }
 
 __inline__ __device__ void
-sharedMemExclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile uint* sScratch, uint size)
+sharedMemExclusiveScan(int threadIndex, uint* sInput, uint* sOutput, uint* sScratch, uint size)
 {
     //printf("Ugh\n");
     
@@ -198,16 +200,13 @@ sharedMemExclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile ui
         uint *idata_addr = sInput + threadIndex*NUM_FIELDS;
         //printf("idata: %d, idata_addr[]: %d\n", idata, *idata_addr);
         //Bottom-level inclusive warp scan
-        volatile uint *warpResult = warpScanInclusive(threadIndex, 
+        uint *warpResult = warpScanInclusive(threadIndex, 
         idata_addr, sScratch, WARP_SIZE);
 
         // Save top elements of each warp for exclusive warp scan sync
         // to wait for warp scans to complete (because s_Data is being
         // overwritten)
         __syncthreads();
-
-
-    }
 
     /*
         if ( (threadIndex & (WARP_SIZE - 1)) == (WARP_SIZE - 1) ){
@@ -221,7 +220,7 @@ sharedMemExclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile ui
         if ( threadIndex < (SCAN_BLOCK_DIM / WARP_SIZE)) {
             // grab top warp elements
             //uint val = sScratch[threadIndex];
-            volatile uint *val_addr = sScratch+threadIndex*NUM_FIELDS;
+            uint *val_addr = sScratch+threadIndex*NUM_FIELDS;
             //calculate exclusive scan and write back to shared memory
             //sScratch[threadIndex] = warpScanExclusive(threadIndex, val, 
             //sScratch, size >> LOG2_WARP_SIZE);
@@ -236,15 +235,16 @@ sharedMemExclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile ui
         vpoint_to_cells(warpResult, sOutput+threadIndex*NUM_FIELDS);
         sum_point_cells(sOutput+threadIndex*NUM_FIELDS, sScratch+NUM_FIELDS*(threadIndex >> LOG2_WARP_SIZE));
         diff_point_cells(sOutput+threadIndex*NUM_FIELDS, idata_addr);
-        
+        */
     
-    } else if (threadIndex < WARP_SIZE) {
+    } 
+    /*else if (threadIndex < WARP_SIZE) {
         //uint idata = sInput[threadIndex];
         uint *idata_addr = sInput + threadIndex*NUM_FIELDS;
         //sOutput[threadIndex] = warpScanExclusive(threadIndex, idata, sScratch, size);
-        volatile uint *warpResult = warpScanExclusive(threadIndex, idata_addr, sScratch, size);
+        uint *warpResult = warpScanExclusive(threadIndex, idata_addr, sScratch, size);
         vpoint_to_cells(warpResult, sOutput+threadIndex*NUM_FIELDS);
         
-    }
-*/
+    }*/
+
 }

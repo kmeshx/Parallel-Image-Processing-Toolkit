@@ -170,12 +170,16 @@ __global__ void update_mean(Point* means_cluster, Point *means_block,
     int id = first_block_id + threadIdx.x;
     if(id < total_num_points){
     mask_cluster(data, assignments, total_num_points, k, cluster, 
-        id, block_mask_cluster, threadIdx.x);
+       id, block_mask_cluster, threadIdx.x);
     __syncthreads();
+    /*if(threadIdx.x < SCAN_BLOCK_DIM){
+        printf("TID: %d\n", threadIdx.x);
+    }*/
     sharedMemExclusiveScan(threadIdx.x, 
         block_mask_cluster, sum_output, 
     scratch, SCAN_BLOCK_DIM);
     __syncthreads();
+    printf("PSV: %d\n", sum_output[SCAN_BLOCK_DIM*NUM_FIELDS-1]);
     /*set_block_means(sum_output, means_block, first_block_id, id, blockIdx.x);
     */
     }
