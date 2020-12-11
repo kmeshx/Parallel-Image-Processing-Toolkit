@@ -18,7 +18,9 @@
 float VSOBEL[9] = {-1.0/8, 0, 1.0/8, -2.0/8, 0, 2.0/8, -1.0/8, 0, 1.0/8};
 //horizontal edge detection
 //float HSOBEL[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0};
-float HSOBEL[9] = {-1.0/8, -2.0/8, -1.0/8, 0, 0, 0, 1.0/8, 2.0/8, 1.0/8};
+float HSOBEL[9] = {1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3};
+
+//HSOBEL[9] = {-1.0/9, -2.0/9, -1.0/9, 0, 0, 0, 1.0/9, 2.0/9, 1.0/9};
 
 
 int otsu_binarization(uint8_t* &gray_img, int width, int height){
@@ -81,28 +83,25 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
 //TODO what to do about negative values??
 void convolve_one_pass(uint8_t* &old_img, uint8_t* &new_img, float kernel[9], int k_width, int k_height, int img_width, int img_height){
     float tmp, kernel_elem = 0.f;
-    int i, j, ii, jj, id_w, id_h, k_h, k_w;
-    for(j = 0; j< img_height; j++){
+    int i, j, ii, jj, id_w, id_h, k_h, k_w, jj_last, ii_last;
 
+    for(j = 0; j< img_height; j++){
         for(i = 0; i< img_width; i++){
             tmp = 0.f;
-            for(jj = 0; jj<k_height; jj++){
-                for(ii = 0; ii< k_width; ii++){
-                    id_h = j + jj;
-                    id_w = i + ii;
-                    k_w = k_width - ii - 1;
-                    k_h = k_height - jj - 1;
-                    if(id_w<img_width && id_h <img_height){
-                        kernel_elem = kernel[k_h * k_width + k_w];
-                        tmp += kernel_elem * (old_img[id_h * img_width + id_w]);
-                    }
+            jj_last = std::min(j + k_height, img_height);
+            ii_last = std::min(i + k_width, img_width);
+            for(jj = j; jj<jj_last; jj++){
+                for(ii = i; ii< ii_last; ii++){
+                    kernel_elem = kernel[(jj-j) * k_width + (ii-i)];
+                    tmp += kernel_elem * (old_img[jj * img_width + ii]);
                 }
-            }            
+            }
+            //printf("%f\n", tmp);
             new_img[j * img_width + i] = (uint8_t)(tmp);
         }
     }
-    otsu_binarization(new_img, img_width, img_height);
-    //stbi_write_png("cs_test1_out.png", img_width, img_height, CHANNEL_NUM, new_img, img_width*CHANNEL_NUM);  
+    //otsu_binarization(new_img, img_width, img_height);
+    stbi_write_png("out.png", img_width, img_height, CHANNEL_NUM, new_img, img_width*CHANNEL_NUM);  
     printf("Finished edge\n");
 }
 
