@@ -159,13 +159,13 @@ void convolve_chunk(int nthreads, uint8_t* &old_img, uint8_t* &new_img, int chun
 
 int main(int argc, char **argv){
     printf("Starting off ... \n");
-    const char *img_file = "building.jpg";
+    const char *img_file = argv[2];
     int width, height, bpp;
     uint8_t* gray_img = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM); 
     uint8_t* new_img = (uint8_t*)malloc(width * height * sizeof(uint8_t) * CHANNEL_NUM);
     int num_threads = atoi(argv[1]);
     omp_set_num_threads(num_threads);
-    char type = argv[2][0];
+    char type = argv[3][0];
 
     double start_time_exc = currentSeconds();
     for(int i=0; i<200; i++){
@@ -177,7 +177,7 @@ int main(int argc, char **argv){
             convolve_two_pass_locality(num_threads, gray_img, new_img, HSOBEL_H, HSOBEL_V, 3, 3, width, height);
         }
         else if(type=='c'){
-            int chunk_size = atoi(argv[3]);
+            int chunk_size = atoi(argv[4s]);
             convolve_chunk(num_threads, gray_img, new_img, chunk_size, HSOBEL_H, HSOBEL_V, 3, 3, width, height);
         }
     }
