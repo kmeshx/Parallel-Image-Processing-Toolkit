@@ -65,12 +65,11 @@ void convolve_one_pass(int nthreads, uint8_t* &old_img, uint8_t* &new_img, float
                     tmp += kernel[(jj-j) * k_width + (ii-i)] * (old_img[jj * img_width + ii]);
                 }
             }     
-            new_img[j * img_width + i] = (uint8_t)(tmp);
+            new_img[j * img_width + i] = (uint8_t)sqrt(tmp*tmp);
         }
     }
     
     stbi_write_png("one_pass.png", img_width, img_height, CHANNEL_NUM, new_img, img_width*CHANNEL_NUM);  
-    //printf("Finished edge\n");
 }
 
 
@@ -103,7 +102,7 @@ void convolve_two_pass_locality(int nthreads, uint8_t* &old_img, uint8_t* &new_i
             for(jj = j; jj< jj_last; jj++){
                 tmp += kernel_h[jj-j] * tmp_buf[jj*img_width + i];
             }
-            new_img[j * img_width + i] = (uint8_t)(tmp);
+            new_img[j * img_width + i] = (uint8_t)sqrt(tmp*tmp);
         }
     }
     stbi_write_png("two_pass.png", img_width, img_height, CHANNEL_NUM, new_img, img_width*CHANNEL_NUM);  
@@ -134,7 +133,7 @@ void convolve_chunk(int nthreads, uint8_t* &old_img, uint8_t* &new_img, int chun
                 for(ii = i; ii< ii_last; ii++){                  
                     tmp += kernel_w[ii-i] * old_img[j2*img_width + ii];
                 }   
-                tmp_buf[(j2-j) * img_width + i] = (tmp);
+                tmp_buf[(j2-j) * img_width + i] = (uint8_t)sqrt(tmp*tmp);
             }
         }
         //#pragma omp simd
@@ -147,7 +146,7 @@ void convolve_chunk(int nthreads, uint8_t* &old_img, uint8_t* &new_img, int chun
                 for(jj = j2; jj< jj_last; jj++){
                     tmp += kernel_h[jj-j2] * tmp_buf[(jj-j)*img_width + i];
                 }
-                new_img[j2 * img_width + i] = (uint8_t)(tmp);
+                new_img[j2 * img_width + i] = (uint8_t)sqrt(tmp*tmp);
             }
         }
         
