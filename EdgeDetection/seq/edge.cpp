@@ -15,10 +15,12 @@
 // 0: VSOBEL, 1: HSOBEL
 
 //vertical edge dection
-float VSOBEL[9] = {-1.0/8, 0, 1.0/8, -2.0/8, 0, 2.0/8, -1.0/8, 0, 1.0/8};
+//float VSOBEL[9] = {-1.0/8, 0, 1.0/8, -2.0/8, 0, 2.0/8, -1.0/8, 0, 1.0/8};
 //horizontal edge detection
 //float HSOBEL[9] = {0, 0, 0, 0, 1, 0, 0, 0, 0};
-float HSOBEL[9] = {1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3};
+float HSOBEL[9] = {-1.0, -2.0, -1.0, 0, 0, 0, 1.0, 2.0, 1.0};
+
+//float HSOBEL[9] = {1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3, 1.0/3};
 
 //HSOBEL[9] = {-1.0/9, -2.0/9, -1.0/9, 0, 0, 0, 1.0/9, 2.0/9, 1.0/9};
 
@@ -97,7 +99,7 @@ void convolve_one_pass(uint8_t* &old_img, uint8_t* &new_img, float kernel[9], in
                 }
             }
             //printf("%f\n", tmp);
-            new_img[j * img_width + i] = (uint8_t)(tmp);
+            new_img[j * img_width + i] = (uint8_t)sqrt(tmp*tmp);
         }
     }
     //otsu_binarization(new_img, img_width, img_height);
