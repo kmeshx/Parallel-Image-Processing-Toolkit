@@ -9,7 +9,7 @@ all: $(EXECUTABLE)
 ###########################################################
 
 OBJDIR=objs
-CXX=g++ -m64 
+CXX = g++ -std=c++11
 CXXFLAGS=-O3 -Wall -g
 LDFLAGS=-L/usr/local/depot/cuda-10.2/lib64/ -lcudart
 NVCC=nvcc
