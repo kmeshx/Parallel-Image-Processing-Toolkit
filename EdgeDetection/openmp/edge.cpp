@@ -134,7 +134,7 @@ void convolve_chunk(int nthreads, uint8_t* &old_img, uint8_t* &new_img, int chun
                 for(ii = i; ii< ii_last; ii++){                  
                     tmp += kernel_w[ii-i] * old_img[j2*img_width + ii];
                 }   
-                tmp_buf[(j2-j) * img_width + i] = (uint8_t)sqrt(tmp*tmp);
+                tmp_buf[(j2-j) * img_width + i] = tmp;
             }
         }
         //#pragma omp simd
