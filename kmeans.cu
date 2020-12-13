@@ -12,10 +12,6 @@
 #include "stb_image_write.h"
 #define BLOCK_SIDE 1024
 #define CHANNEL_NUM 3
-#define IMG_FILE "cs_test1.jpg"
-#define NUM_CLUSTERS 3
-#define NUM_ITERS 2048
-#define NUM_CHUNKS 384
 #include <unistd.h>
 #include <stdio.h>
 #include <cstdlib>
@@ -177,7 +173,8 @@ __global__ void mask_cluster(Point* data, size_t* assignments, int total_num_poi
     }
 }
 
-__global__ void sum_for_blocks(Point *data_scratch, Point *means_block, int total_num_points){
+__global__ void sum_for_blocks(Point *data_scratch, Point *means_block, 
+    int total_num_points, int NUM_CHUNKS){
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     //this id between 0 and b = NUM_CHUNKS
     if(id < NUM_CHUNKS){
@@ -199,12 +196,12 @@ __global__ void sum_for_blocks(Point *data_scratch, Point *means_block, int tota
 
 void update_mean(dim3 gridDim, dim3 threadsPerBlock, dim3 gridDimC, dim3 threadsPerBlockC, 
     Point *means_block, Point* data, size_t* assignments, 
-    int total_num_points, int k, int cluster, Point *data_scratch){
+    int total_num_points, int k, int cluster, Point *data_scratch, int b){
     //mask & keep points only within cluster instead of all k clusters
     mask_cluster<<<gridDim, threadsPerBlock>>>(data, assignments, total_num_points, 
     k, cluster, data_scratch);
     //printf("wtf");
-    sum_for_blocks<<<gridDim, threadsPerBlock>>>(data_scratch, means_block, total_num_points);
+    sum_for_blocks<<<gridDim, threadsPerBlock>>>(data_scratch, means_block, total_num_points, b);
     //printf("xxx");
 }
 
@@ -224,7 +221,7 @@ void k_means_main(dim3 gridDim, dim3 threadsPerBlock, dim3 gridDimC, dim3 thread
             //printf("UM1\n");
             update_mean(gridDim, threadsPerBlock, gridDimC, threadsPerBlockC, 
             means_block_device, points, assignments, 
-            total_num_points, k, cluster, data_scratch);
+            total_num_points, k, cluster, data_scratch, b);
             //printf("UM2\n");
             cluster_from_blocks<<<gridDim, threadsPerBlock>>>(means_cluster_device, 
             means_block_device, cluster, b);
@@ -262,7 +259,7 @@ void set_init_means(uint8_t *rgb_image, Point *means_cluster_host, Point *means_
 }
 
 void k_means(uint8_t* rgb_image, int width, int height, 
-    size_t k, size_t number_of_iterations) {
+    size_t k, size_t number_of_iterations, int b) {
 
     int total_points = width*height;
     int total_cpoints = total_points*CHANNEL_NUM;
@@ -274,11 +271,10 @@ void k_means(uint8_t* rgb_image, int width, int height,
     dim3 gridDim(NUM_BLOCKS_X , NUM_BLOCKS_Y, 1);
     //create chunk grid dims
     //total_points/NUM_CHUNKS * NUM_CHUNKS + total_points%NUM_CHUNKS = total_points
-    const int NUM_THREADS_XC = (total_points/NUM_CHUNKS) + 1;
+    const int NUM_THREADS_XC = (total_points/b) + 1;
     dim3 threadsPerBlockC(NUM_THREADS_XC, 1, 1);
-    dim3 gridDimC(NUM_CHUNKS , 1, 1);
+    dim3 gridDimC(b , 1, 1);
     //printf("TPB: %d, NC: %d\n", NUM_THREADS_XC, gridDimC.x);
-    int b = NUM_CHUNKS;
 
     //initialize means in before launching kernels since k will typically
     //be much smaller compared to image sizes
@@ -320,17 +316,46 @@ void k_means(uint8_t* rgb_image, int width, int height,
 
     double end_time = currentSeconds();
     double duration_exc = end_time - start_time_exc;
-    printf("Time: %f\n", duration_exc);
+    printf("%f, ", duration_exc);
 
     //copy image back into host from device
     cudaMemcpy(new_img, new_img_device, sizeof(uint8_t) * total_cpoints, cudaMemcpyDeviceToHost);
-    stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
+    stbi_write_png("out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
+}
+
+int main_single(int argc, char **argv){
+    const char *img_file = argv[1];//"images/cs_test1.jpg";
+    int NUM_CLUSTERS = atoi(argv[2]);
+    int NUM_ITERS = atoi(argv[3]);
+    int NUM_CHUNKS = atoi(argv[4]);
+    int width, height, bpp;
+    uint8_t* rgb_image = stbi_load(img_file, &width, &height, 
+    &bpp, CHANNEL_NUM);  
+    k_means(rgb_image, width, height, NUM_CLUSTERS, NUM_ITERS, NUM_CHUNKS);    
+    return 1;
 }
 
 int main(int argc, char **argv){
-    const char *img_file = "images/cs_test1.jpg";
-    int width, height, bpp;
-    uint8_t* rgb_image = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM);  
-    k_means(rgb_image, width, height, NUM_CLUSTERS, NUM_ITERS);    
+    int NUM_IMGS_all = 1;
+    int NUM_CLUSTERS_all = 3;//atoi(argv[2]);
+    int NUM_ITERS_all = 2048; //atoi(argv[3]);
+    int NUM_CHUNKS_all = 8; //atoi(argv[4]);
+
+    static const char* imgs[] = {"images/medium.jpg",
+    "images/small.jpg", "images/large.jpg"};
+    static const int chunks[] = {32, 64, 128, 156, 192, 256, 384, 512};
+    for(int i = 0; i < NUM_IMGS_all; i++){
+        printf("Image %d\n", i);
+        for(int j = 0; j < NUM_CHUNKS_all; j++){
+            int width, height, bpp;
+            uint8_t* rgb_image = stbi_load(imgs[i], &width, &height, 
+            &bpp, CHANNEL_NUM);  
+            //printf("read");
+            k_means(rgb_image, width, height, NUM_CLUSTERS_all, 
+                NUM_ITERS_all, chunks[j]);    
+            
+        }
+        printf("\n");
+    }
     return 1;
 }
