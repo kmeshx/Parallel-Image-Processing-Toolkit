@@ -38,9 +38,9 @@
 
 // int linearThreadIndex =  threadIdx.y * blockDim.y + threadIdx.x;
 
-// __shared__ uint prefixSumInput[BLOCKSIZE];
-// __shared__ uint prefixSumOutput[BLOCKSIZE];
-// __shared__ uint prefixSumScratch[2 * BLOCKSIZE];
+// __shared__ int prefixSumInput[BLOCKSIZE];
+// __shared__ int prefixSumOutput[BLOCKSIZE];
+// __shared__ int prefixSumScratch[2 * BLOCKSIZE];
 // sharedMemExclusiveScan(linearThreadIndex, prefixSumInput, prefixSumOutput, prefixSumScratch, BLOCKSIZE);
 
 
@@ -49,20 +49,20 @@
 
 //Almost the same as naive scan1Inclusive, but doesn't need __syncthreads()
 //assuming size <= WARP_SIZE
-inline __device__ uint
-warpScanInclusive(int threadIndex, uint idata, volatile uint *s_Data, uint idata_sum, volatile uint *s_Data_sum, uint size){
+inline __device__ int
+warpScanInclusive(int threadIndex, int idata, volatile int *s_Data, int idata_sum, volatile int *s_Data_sum, int size){
     // Note some of the calculations are obscure because they are optimized.
     // For example, (threadIndex & (size - 1)) computes threadIndex % size,
     // which works, assuming size is a power of 2.
 
-    uint pos = 2 * threadIndex - (threadIndex & (size - 1));
+    int pos = 2 * threadIndex - (threadIndex & (size - 1));
     s_Data[pos] = 0;
     s_Data_sum[pos] = 0;
     pos += size;
     s_Data[pos] = idata;
     s_Data_sum[pos] = idata_sum;
 
-    for(uint offset = 1; offset < size; offset <<= 1)
+    for(int offset = 1; offset < size; offset <<= 1)
     {
         s_Data[pos] += s_Data[pos - offset];
         s_Data_sum[pos] += s_Data_sum[pos - offset];
@@ -72,18 +72,18 @@ warpScanInclusive(int threadIndex, uint idata, volatile uint *s_Data, uint idata
 }
 
 __inline__ __device__ void
-sharedMemInclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile uint* sScratch, uint* input_sum, uint* output_sum, volatile uint* scratch_sum, uint size)
+sharedMemInclusiveScan(int threadIndex, int* sInput, int* sOutput, volatile int* sScratch, int* input_sum, int* output_sum, volatile int* scratch_sum, int size)
 {
-        uint pos;
+        int pos;
         if (size > WARP_SIZE) {
 
-        uint idata = sInput[threadIndex];
-        uint idata_sum = input_sum[threadIndex];
+        int idata = sInput[threadIndex];
+        int idata_sum = input_sum[threadIndex];
 
         //Bottom-level inclusive warp scan
         pos = warpScanInclusive(threadIndex, idata, sScratch, idata_sum, scratch_sum, WARP_SIZE);
-        uint warpResult = sScratch[pos];
-        uint warpResult_sum = scratch_sum[pos];
+        int warpResult = sScratch[pos];
+        int warpResult_sum = scratch_sum[pos];
 
         // Save top elements of each warp for exclusive warp scan sync
         // to wait for warp scans to complete (because s_Data is being
@@ -100,9 +100,9 @@ sharedMemInclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile ui
 
         if ( threadIndex < (SCAN_BLOCK_DIM / WARP_SIZE)) {
             // grab top warp elements
-            uint val = sScratch[threadIndex];
-            uint val_sum = scratch_sum[threadIndex];
-            //uint val_sum = scratch_sum[threadIdx];
+            int val = sScratch[threadIndex];
+            int val_sum = scratch_sum[threadIndex];
+            //int val_sum = scratch_sum[threadIdx];
             // calculate exclusive scan and write back to shared memory
             pos = warpScanInclusive(threadIndex, val, sScratch, val_sum, scratch_sum, WARP_SIZE);
             sScratch[threadIndex] = sScratch[pos];
@@ -118,8 +118,8 @@ sharedMemInclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile ui
         sOutput[threadIndex] = warpResult + sScratch[threadIndex >> LOG2_WARP_SIZE] - idata;
         output_sum[threadIndex]  = warpResult + scratch_sum[threadIndex >> LOG2_WARP_SIZE] - idata_sum;
         } else if (threadIndex < WARP_SIZE) {
-        uint idata = sInput[threadIndex];
-        uint idata_sum = scratch_sum[threadIndex];
+        int idata = sInput[threadIndex];
+        int idata_sum = scratch_sum[threadIndex];
         pos = warpScanInclusive(threadIndex, idata, sScratch, idata_sum, scratch_sum, size);
         sOutput[threadIndex] = sScratch[pos];
         scratch_sum[threadIndex] = scratch_sum[pos];

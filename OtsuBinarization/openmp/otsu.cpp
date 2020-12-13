@@ -82,7 +82,8 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
     int total_num = 0;
     int thresh = 0;
     uint8_t *new_img = (uint8_t *) malloc(total_pts * sizeof(uint8_t));
-
+    float start_time_exc = currentSeconds();
+    for(int iter = 0; iter<400; iter++){
     #pragma omp parallel for shared(histogram) private(i)
     for(i=0; i< MAX_INTENSITY; i++){
         histogram[i] = 0.0;
@@ -134,8 +135,13 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
             new_img[i] = 0;
         }
     }
-  
-  stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
+    printf("OK");
+
+  //stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
+    }
+        float duration_exc = end_time - start_time_exc;
+    fprintf(stdout, "Time Without Startup: %f\n", duration_exc);
+
   printf("Finished otsu\n");
   return 1;
 }
