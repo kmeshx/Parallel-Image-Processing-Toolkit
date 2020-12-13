@@ -10,13 +10,14 @@
 //#include <random>
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "../../utils/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "../../utils/stb_image_write.h"
+#include "../../utils/cycletimer.h"
+
 #define CHANNEL_NUM 1
 #define MAX_INTENSITY 256
 #define OMP_NESTED true
-
 
 void scan_parallel(double* &cum_histogram, double* &cum_sum){
     int i, d, k;
