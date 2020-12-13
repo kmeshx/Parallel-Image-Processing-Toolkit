@@ -9,43 +9,24 @@ Results
 Buiding
 
 (1, 2, 4, 8, 16, 24, 32)
-0.456641
-0.356257
-0.322506
-0.284558
-0.318712
-0.322246
-0.354643
-
-Dynamic
-0.456174
-0.380942
-0.319642
-0.315810
-0.342669
-0.365078
-0.436242
+0.525091
+0.418436
+0.364750
+0.373820
+0.388213
+0.387869
+0.414143
 
 (other)
 (1, 2, 4, 8, 16, 24, 32)
-0.082043
-0.081858
-0.074505
-0.080633
-0.101323
-0.110661
-0.131641
+0.082527
+0.074112
+ 0.069396
+0.073562
+ 0.085186
+ 0.092566
+0.165442
 
-Dynamic OpenMP
-(1, 2, 4, 8, 16, 24, 32)
-
-0.082314
- 0.114312
-0.097692
- 0.102615
- 0.126754
-0.112121
-0.171893
 
 */
 
@@ -70,88 +51,91 @@ Dynamic OpenMP
 #define OMP_NESTED true
 #define NT 24
 
-void scan_eff_parallel(int* &cum_histogram, int* &cum_sum, int nthreads){
-    for(int d = 0; d<8; d++){
-        #pragma omp parallel for num_threads(nthreads)
-        for(int k=0; k<MAX_INTENSITY; k+=(1<<(d+1)))
-        {
-            cum_histogram[(1<<(d+1))+k-1] += cum_histogram[(1<<d) + k-1] ;
-            cum_sum[(1<<(d+1))+k-1] += cum_sum[(1<<d )+ k-1];
+void scan_work_efficient_parallel(double* &cum_histogram, double* &cum_sum, int nthreads){
+    int i, d, k;
+    for(d = 0; d<MAX_INTENSITY; d<<=1){
+        #pragma omp parallel for num_threads(nthreads) 
+        for(k=0; k<MAX_INTENSITY; k+=2*d){
+            cum_histogram[2*d+k-1] = cum_histogram[2*d+k-1] + cum_histogram[d+k-1] ;
+            cum_sum[2*d+k-1] = cum_sum[2*d+k-1] + cum_sum[d+k-1];
         }
     }
-    
+
     // down sweep
     double tmp_sum, tmp_histogram;
+    
     cum_histogram[MAX_INTENSITY-1] = 0;
     cum_sum[MAX_INTENSITY-1] = 0;
-    for (int d = 7; d>=0; d--) {
+    for (d = MAX_INTENSITY/2; d>0; d>>=1) {
         #pragma omp parallel for num_threads(nthreads)
-        for (int k = 0; k < MAX_INTENSITY; k+= (1<<(d+1)))
-        {
-            tmp_histogram = cum_histogram[(1<<d)+k-1];
-            tmp_sum = cum_sum[(1<<d)+k-1];
-            cum_histogram[(1<<d)+k-1] = cum_histogram[(1<<(d+1)) + k-1];
-            cum_histogram[(1<<(d+1))+k-1] += tmp_histogram ;
-            cum_sum[(1<<d)+k-1] = cum_sum[(1<<(d+1)) + k-1];
-            cum_sum[(1<<(d+1))+k-1] += tmp_sum ;
+        for (k = 0; k < MAX_INTENSITY; k += 2*d){
+            tmp_histogram = cum_histogram[d+k-1];
+            tmp_sum = cum_sum[d+k-1];
+            cum_histogram[d+k-1] = cum_histogram[2*d + k-1];
+            cum_histogram[2*d+k-1] = tmp_histogram + cum_histogram[2*d + k-1];
+            cum_sum[d+k-1] = cum_sum[2*d + k-1];
+            cum_sum[2*d+k-1] = tmp_sum + cum_sum[2*d + k-1];
         }
     }
+    /*for(i=0; i<5; i++)
+    {
+        std::cout<<cum_histogram[i]<<" ";
+    }
+    std::cout<<"\n";
+    */
 
 
 }
 
-void scan_parallel(int* &cum_histogram, int* &cum_sum, int nthreads){
+void scan_parallel(double* &cum_histogram, double* &cum_sum, int nthreads){
     int i, d, k;
-    int log_max = 8;
-    for(int i = 0; i< 10; i++){
-        printf("%d ", cum_histogram[i]);
+    for(d = 1; d<MAX_INTENSITY; d<<=1){
+        #pragma omp parallel for num_threads(nthreads) 
+        for(k=1<<d; k<MAX_INTENSITY; k++){
+            cum_histogram[k] = cum_histogram[k-(1<<(d-1)] + cum_histogram[k] ;
+            cum_sum[k] = cum_sum[k-(1<<(d-1)] + cum_sum[k] ;
+        }
     }
-    /*
 
-    for(int k = 1; k<MAX_INTENSITY; k++){
-        cum_histogram[k] = cum_histogram[k] + cum_histogram[k-1];
-        cum_sum[k] = cum_sum[k] + cum_sum[k-1];
-
+    // down sweep
+    double tmp_sum, tmp_histogram;
+    
+    cum_histogram[MAX_INTENSITY-1] = 0;
+    cum_sum[MAX_INTENSITY-1] = 0;
+    for (d = MAX_INTENSITY/2; d>0; d>>=1) {
+        #pragma omp parallel for num_threads(nthreads)
+        for (k = 0; k < MAX_INTENSITY; k += 2*d){
+            tmp_histogram = cum_histogram[d+k-1];
+            tmp_sum = cum_sum[d+k-1];
+            cum_histogram[d+k-1] = cum_histogram[2*d + k-1];
+            cum_histogram[2*d+k-1] = tmp_histogram + cum_histogram[2*d + k-1];
+            cum_sum[d+k-1] = cum_sum[2*d + k-1];
+            cum_sum[2*d+k-1] = tmp_sum + cum_sum[2*d + k-1];
+        }
     }
+    /*for(i=0; i<5; i++)
+    {
+        std::cout<<cum_histogram[i]<<" ";
+    }
+    std::cout<<"\n";
     */
-    for(d = 1; d<=8; d++){
-        //#pragma omp parallel for num_threads(nthreads) 
-        for(k=d-1; k<MAX_INTENSITY; k+= d){
-            cum_histogram[k] += cum_histogram[k-d] ;
-            cum_sum[k] += cum_sum[k-d] ;
-        }
-    }
 
-    for(d = d>>1; d>1; d>>=1){
-        //#pragma omp parallel for num_threads(nthreads) 
-        for(k=d-1; k<MAX_INTENSITY-d; k+= d){
-            cum_histogram[d+k] += cum_histogram[k] ;
-            cum_sum[d+k] += cum_sum[k] ;
-        }
-    }
-
-    printf("\n");
-    for(int i = 0; i< 10; i++){
-        printf("%d ", cum_histogram[i]);
-    }
-
-    return;
 
 }
 
 
 int otsu_binarization(uint8_t* &gray_img, int width, int height, int nthreads){
     // Pick centroids as random points from the dataset.
-    int histogram[MAX_INTENSITY];
-    int* cum_histogram = (int*)malloc(sizeof(double) * MAX_INTENSITY);
-    int* cum_sum = (int*)malloc(sizeof(double) * MAX_INTENSITY);
+    double histogram[MAX_INTENSITY];
+    double* cum_histogram = (double*)malloc(sizeof(double) * MAX_INTENSITY);
+    double* cum_sum = (double*)malloc(sizeof(double) * MAX_INTENSITY);
     double* max_vars = (double*)malloc(sizeof(double)*MAX_INTENSITY);
 
     //vector<int> histogram(MAX_INTENSITY); //gray scale image
     int index;
     double total_sum=0.0;
-    int hist_sum=0.0;
-    int hist_val_sum=0.0;
+    double hist_sum=0.0;
+    double hist_val_sum=0.0;
     double p1_sum, p2_sum, p1_num, p2_num = 0;
     double p1_mu, p2_mu, var, threshold = 0;
     int total_pts = width * height;
@@ -161,20 +145,19 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height, int nthreads){
     //int thresh = 0;
     uint8_t *new_img = (uint8_t *) malloc(total_pts * sizeof(uint8_t));
     for(int iter = 0; iter<400; iter++){
-    
-    #pragma omp parallel for num_threads(nthreads) 
+    #pragma omp parallel for num_threads(nthreads) //schedule(dynamic)
     for(int i=0; i< MAX_INTENSITY; i++){
-        histogram[i] = 0;
+        histogram[i] = 0.0;
     }
 
     //TEST ??
     //#pragma omp parallel for num_threads(nthreads) shared(histogram, gray_img)
     for (int i=0; i<width* height; i++) {
-       // #pragma omp atomic
-        histogram[gray_img[i]] += 1;
+        //#pragma omp atomic
+        histogram[gray_img[i]] += 1.0;
     }
 
-    #pragma omp parallel for num_threads(nthreads) reduction(+: total_sum) schedule(dynamic)
+    #pragma omp parallel for num_threads(nthreads) reduction(+: total_sum) //schedule(dynamic)
     for(int i=0; i<MAX_INTENSITY; i++){
         total_sum += double(i) * (histogram[i]) ;
         // set initial values for the reduction
@@ -182,9 +165,9 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height, int nthreads){
         cum_sum[i] = i * histogram[i];
     }
 
-    scan_eff_parallel(cum_histogram, cum_sum, nthreads);
-    
-    #pragma omp parallel for num_threads(nthreads) schedule(dynamic)
+    scan_parallel(cum_histogram, cum_sum, nthreads);
+
+    #pragma omp parallel for num_threads(nthreads) //schedule(dynamic)
     for(int thresh=0; thresh<MAX_INTENSITY; thresh++){
         int p1_num = cum_histogram[thresh];
         int p2_num = total_pts - p1_num;
@@ -205,18 +188,16 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height, int nthreads){
 	    max_vars[thresh] = var;
     }
 
-
-    #pragma omp parallel for num_threads(nthreads) reduction(max: max_var) 
+    #pragma omp parallel for num_threads(nthreads) reduction(max: max_var) //schedule(dynamic)
     for(int thresh=0; thresh<MAX_INTENSITY; thresh++){
 	    max_var = std::max(max_var, max_vars[thresh]);
 	}
-    #pragma omp parallel for num_threads(nthreads)
+    #pragma omp parallel for num_threads(nthreads) //schedule(dynamic)
     for(int thresh=0; thresh<MAX_INTENSITY; thresh++){
-	    if(max_vars[thresh]==max_var) threshold=thresh;
-    }   
-    
+	if(max_vars[thresh]==max_var) threshold=thresh;
+}
 
-    #pragma omp parallel for num_threads(nthreads) 
+    #pragma omp parallel for num_threads(nthreads) //schedule(dynamic)
     for(int i=0; i< total_pts; i++){
         if(gray_img[i]> threshold){
             new_img[i] = 255;
