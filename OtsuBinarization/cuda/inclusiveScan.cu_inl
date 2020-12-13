@@ -68,13 +68,12 @@ warpScanInclusive(int threadIndex, uint idata, volatile uint *s_Data, uint size)
 __inline__ __device__ void
 sharedMemInclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile uint* sScratch, uint size)
 {
-    for(int i = 0; i< MAX_INTENSITY; i++){
         if (size > WARP_SIZE) {
 
-        uint idata = sInput[i][threadIndex];
+        uint idata = sInput[threadIndex];
 
         //Bottom-level inclusive warp scan
-        uint warpResult = warpScanInclusive(threadIndex, idata, sScratch[i], WARP_SIZE);
+        uint warpResult = warpScanInclusive(threadIndex, idata, sScratch, WARP_SIZE);
 
         // Save top elements of each warp for exclusive warp scan sync
         // to wait for warp scans to complete (because s_Data is being
@@ -82,26 +81,26 @@ sharedMemInclusiveScan(int threadIndex, uint* sInput, uint* sOutput, volatile ui
         __syncthreads();
 
         if ( (threadIndex & (WARP_SIZE - 1)) == (WARP_SIZE - 1) )
-            sScratch[i][threadIndex >> LOG2_WARP_SIZE] = warpResult;
+            sScratch[threadIndex >> LOG2_WARP_SIZE] = warpResult;
 
         // wait for warp scans to complete
         __syncthreads();
 
         if ( threadIndex < (SCAN_BLOCK_DIM / WARP_SIZE)) {
             // grab top warp elements
-            uint val = sScratch[i][threadIndex];
+            uint val = sScratch[threadIndex];
             // calculate exclusive scan and write back to shared memory
-            sScratch[i][threadIndex] = warpScanInclusive(threadIndex, val, sScratch[i], size >> LOG2_WARP_SIZE);
+            sScratch[threadIndex] = warpScanInclusive(threadIndex, val, sScratch, size >> LOG2_WARP_SIZE);
         }
 
         //return updated warp scans with exclusive scan results
         __syncthreads();
 
-        sOutput[i][threadIndex] = warpResult + sScratch[i][threadIndex >> LOG2_WARP_SIZE] - idata;
+        sOutput[threadIndex] = warpResult + sScratch[threadIndex >> LOG2_WARP_SIZE] - idata;
 
         } else if (threadIndex < WARP_SIZE) {
-        uint idata = sInput[i][threadIndex];
-        sOutput[i][threadIndex] = warpScanInclusive(threadIndex, idata, sScratch[i], size);
+        uint idata = sInput[threadIndex];
+        sOutput[threadIndex] = warpScanInclusive(threadIndex, idata, sScratch, size);
         }
-    }
+    
 }
