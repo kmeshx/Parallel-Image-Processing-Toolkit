@@ -1,17 +1,25 @@
+/*
+./otsu <img_file>
+*/ 
 #include <unistd.h>
 #include <algorithm>
 #include <cstdlib>
 #include <limits>
 #include <random>
 #include <vector>
+
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "../../utils/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "../../utils/stb_image_write.h"
+#include "../../utils/cycletimer.h"
+
 #define CHANNEL_NUM 1
 #define MAX_INTENSITY 256
 
+
 int otsu_binarization(uint8_t* &gray_img, int width, int height){
+    for(int i=0; i<200; i++){
     // Pick centroids as random points from the dataset.
     double histogram[MAX_INTENSITY];
     
@@ -23,7 +31,7 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
     int total_pts = width * height;
     double max_var = -1;
     uint8_t *new_img = (uint8_t *) malloc(total_pts * sizeof(uint8_t));
-    
+    p1_num = 0, p2_num=0, p1_sum=0, p2_sum=0;
     for(int i=0; i< MAX_INTENSITY; i++){
         histogram[i] = 0.0;
     }
@@ -65,18 +73,26 @@ int otsu_binarization(uint8_t* &gray_img, int width, int height){
             new_img[i] = 0;
         }
     }
-  
-  stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
-  printf("Finished otsu\n");
+    
+    printf("OK");
+    //stbi_write_png("cs_test1_out.png", width, height, CHANNEL_NUM, new_img, width*CHANNEL_NUM);  
+  }
   return 1;
 }
 
 
 int main(int argc, char **argv){
     printf("Starting off ... \n");
-    const char *img_file = "cs_test1.jpg";
+    const char *img_file = argv[1];
     int width, height, bpp;
     uint8_t* gray_img = stbi_load(img_file, &width, &height, &bpp, CHANNEL_NUM);  
+    float start_time_exc = currentSeconds();
+
+    
     otsu_binarization(gray_img, width, height);
+    
+    float end_time = currentSeconds();
+    float duration_exc = end_time - start_time_exc;
+    fprintf(stdout, "Time Without Startup: %f\n", duration_exc);
     return 1;
 }

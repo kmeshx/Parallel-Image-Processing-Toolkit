@@ -1,15 +1,35 @@
+EXECUTABLE := otsu
+CU_FILES   := otsu.cu
+CU_DEPS    :=
+CC_FILES   := ../utils/cycletimer.cpp
 
+
+all: $(EXECUTABLE)
+
+###########################################################
+
+OBJDIR=objs
 CXX = g++ -std=c++11
-OMP = -fopenmp
-CFLAGS = -O3 -g -Wall -openmp
+CXXFLAGS=-O3 -Wall -g
 
-ICC = icc -m64
-ICFLAGS = -O3 -g -Wall -openmp -offload-attribute-target=mic -DRUN_MIC
 
-all: otsu
+OBJS=$(OBJDIR)/otsu.o $(OBJDIR)/cycletimer.o 
 
-wsp: otsu.cpp cycletimer.cpp
-	            $(ICC) $(ICFLAGS) -o otsu cycletimer.cpp otsu.cpp $(OMP)
+.PHONY: dirs clean
+
+all: $(EXECUTABLE)
+
+default: $(EXECUTABLE)
+
+dirs:
+	mkdir -p $(OBJDIR)/
 
 clean:
-	rm -f *~ otsu
+	rm -rf $(OBJDIR) *.ppm *~ $(EXECUTABLE)
+
+
+$(EXECUTABLE): dirs $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
+
+$(OBJDIR)/%.o: %.cpp
+	$(CXX) $< $(CXXFLAGS) -c -o $@
