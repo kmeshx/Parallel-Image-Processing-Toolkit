@@ -1,6 +1,6 @@
 # Parallel Image Processing Toolkit
 
-Image processing toolbox for several image segmentation algorithms including Otsu Binarization, Edge Detection, and K-Means. The sequential versions of the algorithms are implemented using C++, and the parallel versions were implemented in both OpenMP and CUDA. The goal of this project is to implement and analyze the scalability, scope, and benefit of performing image segmentation in parallel.
+Image processing toolbox for several image segmentation algorithms including Otsu Binarization, Edge Detection, and K-Means. The sequential versions of the algorithms are implemented using C++, and the parallel versions were implemented in both OpenMP and CUDA. The goal of this project is to implement and analyze the scalability, scope, and benefit of performing image segmentation in parallel. In addition to these, the repo also has started code(in-progress) for the Watershed algorithm and the Sobel Edge detector
 
 Image segmentation techniques can be broadly classified into three categories - thresholding, edge detection and clustering. In this project we have implemented one algorithm from each of these main categories, and parallelized them using CUDA and OpenMP. Different parallelization strategies are used for each of these algorithms in order to obtain the best speedups. While these algorithms have the same common goal of image segmentation, their respective details are very different, and each one thus requires carefully testing strategies to get the optimal solution.
 
