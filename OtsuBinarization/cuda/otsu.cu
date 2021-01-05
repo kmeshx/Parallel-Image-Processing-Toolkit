@@ -8,49 +8,7 @@
         had faster despite the input array being of the same size
 */
 
-/*
-OTSU CUDA
 
-Building
-
-Not stream
-1. 0.633789 : 1
-2. 0.323242: 2
-3. 0.245117: 4
-4. 0.221680 : 8
-5. 0.217773: 16
-6. 0.220703: 32
-
-Stream:
-1.  0.545898: 1
-2. 0.269531 : 2
-3. 0.182617: 4
-4. 0.153320: 8
-5. 0.153320: 16
-6. 0.154297: 32
-
-
-Other:
-
-Not Stream
-0.147461
- 0.071289
- 0.051758
- 0.044922
- 0.044922
-0.044922
-
-
-Stream:
-0.123047
-0.049805
-0.030273
-0.029297
-0.029297
-0.029297
-
-*/
-//TODO parallelize over intensities??
 #include <unistd.h>
 #include <algorithm>
 #include <cstdlib>
