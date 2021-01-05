@@ -1,12 +1,4 @@
-/*
-        Different Image Sizes
-        1. atomic add 
-        2. use 1 thread to combine all
-        3. scan
-        4. making blocksize = MAX_INTENSITY
-        for some reason has different writing times ??, otherwise faster
-        had faster despite the input array being of the same size
-*/
+
 
 
 #include <unistd.h>
@@ -35,39 +27,7 @@
 #include "inclusiveScan.cu_inl"
 #define LOG2_WARP_SIZE 5U
 #define WARP_SIZE (1U << LOG2_WARP_SIZE)
-/*
-__global__ void set_kernel(uint8_t* old_img, uint8_t* new_img, int** histograms, int num_blocks_x, int img_width, int img_height){
-    i = blockIdx.x * blockDim.x + threadIdx.x;
-    j = blockIdx.y * blockDim.y + threadIdx.y;
-    int linearThreadIndex =  threadIdx.y * blockDim.x + threadIdx.x;
-    if(i>=img_width || j>=img_height) return;
-    histograms[old_img[idx]][linearThreadIndex] = 1;
-    if(new_img[i][j] ==current_intensity)
 
-}
-    //assumes k_width, k_height = 3
-__global__ void otsu_kernel(uint8_t* old_img, uint8_t* new_img, int** histograms, int num_blocks_x, int img_width, int img_height){
-    int i, j, jj, ii, support_id, img_id, n_img_id;
-
-
-    __shared__ uint input[SCAN_BLOCK_DIM];
-    __shared__ uint output[SCAN_BLOCK_DIM];
-    __shared__ uint scratch[2 * SCAN_BLOCK_DIM];
-    cur_elem = old_img[img_width * j + i];
-    input[cur_elem] += 1;
-    __syncthreads();
-    sharedMemExclusiveScan(linearThreadIndex, input, output, scratch, BLOCKSIZE);
-    
-    __syncthreads();
-    for(int j=0; j< MAX_INTENSITY; j++){
-        
-      
-        
-        histograms[j][num_blocks_x * blockIdx.y + blockIdx.x] += 1;
-       
-    }
-}
-*/
 
 
 // modified from https://stackoverflow.com/questions/17399119/cant-we-use-atomic-operations-for-floating-point-variables-in-cuda
